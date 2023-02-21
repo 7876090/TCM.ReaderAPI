@@ -6,50 +6,32 @@ namespace TCM.ReaderAPI.Services
     {
         private Type? objType;
         private object? obj;
-        private string? resultDescription;
-        private int resultCode;
+        private const int NOT_LOADED_ERROR_CODE = -1;
+        private const string NOT_LOADED_ERROR_CODE_DESCRIPTION = "Ошибка загрузки компоненты!";
 
-        public string ResultDescription
+        public string ResultCodeDescription
         {
-            get { return resultDescription ?? ""; }
+            get
+            {
+                var value = getProperty("ResultCodeDescription") ?? NOT_LOADED_ERROR_CODE_DESCRIPTION;
+                return (string)value;
+            }
         }
         public int ResultCode
         {
-            get { return resultCode; }
-        }
-
-        private void setError(string error, int code = 1)
-        {
-            resultDescription = error;
-            resultCode = code;
-        }
-        private void resetError()
-        {
-            resultDescription = "Ошибок нет.";
-            resultCode = 0;
-        }
-
-
-        public bool Init()
-        {
-            objType = Type.GetTypeFromProgID("OpenAgami.OnlineCardOperationsDriver");
-            if (objType != null)
+            get
             {
-                try
-                {
-                    obj = Activator.CreateInstance(objType);
-                }
-                catch (Exception ex)
-                {
-                    setError(ex.Message);
-                }
+                var value = getProperty("ResultCode") ?? NOT_LOADED_ERROR_CODE;
+                return (int)value;
             }
-            else
+        }
+        public string SmartCardNativeId
+        {
+            get
             {
-                setError("Ошибка загрузки компоненты. Возможно компонента не была установлена!");
+                var value = getProperty("SmartCardNativeId") ?? "";
+                return (string)value;
             }
-
-            return resultCode == 0;
         }
 
 
@@ -70,18 +52,52 @@ namespace TCM.ReaderAPI.Services
                 objType.InvokeMember(name, BindingFlags.SetProperty, null, obj, new object[] { value });
             }
         }
+        private bool executeMethod(string methodName)
+        {
+            return (int)objType.InvokeMember(methodName, BindingFlags.InvokeMethod, null, obj, new object[] { }) == 0;
+        }
+        public bool Init()
+        {
+            bool result = true;
+            if (objType == null)
+            {
+                objType = Type.GetTypeFromProgID("OpenAgami.OnlineCardOperationsDriver");
+                if (objType != null)
+                {
+                    try
+                    {
+                        obj = Activator.CreateInstance(objType);
+                    }
+                    catch (Exception ex) 
+                    {
+                        result = false;
+                    }
+                }
+            }
 
+            return result;
+        }
+        public bool ReadCard()
+        {
+            bool result = false;
+            if(Init())
+            {
+                result = executeMethod("ReadCard");
+            }
+
+            return result;
+        }
         public Task StartAsync(CancellationToken cancellationToken)
         {
             Init();
 
-            if (resultCode == 0)
+            if (ResultCode == 0)
             {
                 return Task.CompletedTask;
             }
             else
             {
-                return Task.FromException(new Exception(resultDescription));
+                return Task.FromException(new Exception(ResultCodeDescription));
             }
         }
         public Task StopAsync(CancellationToken cancellationToken) 

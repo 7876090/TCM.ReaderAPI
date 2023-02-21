@@ -1,14 +1,14 @@
 using Microsoft.Extensions.Hosting.WindowsServices;
 using TCM.ReaderAPI.Services;
 
-var builder = WebApplication.CreateBuilder(args);
-
 var options = new WebApplicationOptions
 {
     Args = args,
     ContentRootPath = WindowsServiceHelpers.IsWindowsService()
                                      ? AppContext.BaseDirectory : default
 };
+var builder = WebApplication.CreateBuilder(options);
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -24,15 +24,26 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+ReaderService rs = new ReaderService();
 
 app.MapGet("/getstatus", () => "{status: \"success\"}").WithName("GetStatus");
 
 app.MapPost("/init", () =>
-{
-    ReaderService rs = new ReaderService();
+{    
     bool result = rs.Init();
 
-    return $"resultDescription: {rs.ResultDescription}";
-});
+    int rc = rs.ResultCode;
+
+    return $"ResultDescription: {rs.ResultCodeDescription}";
+
+}).WithName("Init");
+
+app.MapPost("/readcard", () =>
+{
+    bool result = rs.ReadCard();
+
+    return result ? $"{ rs.SmartCardNativeId }" : $"{ rs.ResultCodeDescription }";
+
+}).WithName("ReadCard");
 
 app.Run();
